@@ -14,14 +14,14 @@ class Network:
         self.vocab_size = len(vocab)
         self.char_to_ix = { c: i for i,c in enumerate(vocab) }
 
-        self.Wxh = np.random.randn(hidden_size, self.vocab_size)
-        self.Whh = np.random.randn(hidden_size, hidden_size)
-        self.Why = np.random.randn(out_size, hidden_size)
+        self.Wxh = np.random.randn(hidden_size, self.vocab_size) * 0.01
+        self.Whh = np.random.randn(hidden_size, hidden_size) * 0.01
+        self.Why = np.random.randn(out_size, hidden_size) * 0.01
 
         self.bh = np.zeros((hidden_size, 1,))
         self.by = np.zeros((out_size, 1,))
 
-        self.eta = 1e-1
+        self.eta = 5e-4
 
     
     def __call__(self, ins, hprev):
@@ -37,9 +37,10 @@ class Network:
         last_h = hs[len(ins)-1]
 
         y = np.dot(self.Why, last_h) + self.by
-        p = np.exp(y) / np.sum(np.exp(y))
+        y_stable = y - np.max(y)
+        p = np.exp(y_stable) / np.sum(np.exp(y_stable))
 
-        return p
+        return p, last_h
 
 
     def train(self, inputs, target, hprev):
@@ -55,7 +56,8 @@ class Network:
         last_h = hs[len(inputs)-1]
 
         y = np.dot(self.Why, last_h) + self.by
-        p = np.exp(y) / np.sum(np.exp(y))
+        y_stable = y - np.max(y)
+        p = np.exp(y_stable) / np.sum(np.exp(y_stable))
 
         loss = -np.sum(target * np.log(p))
 
@@ -71,7 +73,7 @@ class Network:
         dh = np.dot(self.Why.T, dy)
         dhn = np.zeros_like(dh)
 
-        for t in range(len(inputs)-2, 0):
+        for t in reversed(range(0, len(inputs))):
             dh = dh + dhn
             dhraw = (1 - hs[t] * hs[t]) * dh
 
@@ -80,11 +82,7 @@ class Network:
             dWhh += np.dot(dhraw, hs[t-1].T)
             dhn = np.dot(self.Whh.T, dhraw)
 
-        self.Wxh -= self.eta * dWxh
-        self.Whh -= self.eta * dWhh
-        self.Why -= self.eta * dWhy
+        for grad in [dWxh, dWhh, dWhy, dbh, dby]:
+            np.clip(grad, -5, 5, out=grad)
 
-        self.bh -= self.eta * dbh
-        self.by -= self.eta * dby
-
-        return loss, hs[len(inputs)-1]
+        return loss, last_h, dWxh, dWhh, dWhy, dbh, dby

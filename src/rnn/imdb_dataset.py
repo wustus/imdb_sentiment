@@ -9,10 +9,10 @@ class IMDBDataset():
 
     def __init__(self, path):
 
-        self.data = []
-        self.labels = []
+        self.training_data = []
+        self.training_labels = []
 
-        self.test = []
+        self.test_data = []
         self.test_labels = []
 
         self.vocab = set()
@@ -21,22 +21,22 @@ class IMDBDataset():
         self.stopwords = nltk.corpus.stopwords.words("english")
 
         with open(path, encoding="utf-8") as f:
-            lines = f.readlines()[1:][:1000]
+            lines = f.readlines()[1:][:20000]
             train_cutoff = len(lines) / 2
             d_size = len(lines)
             for i, line in enumerate(lines):
                 print(f"\rProcessed {i} / {d_size} entries.", end="", flush=True)
                 line = line.split(",")
                 l = line[-1]
-                l = np.array([[1],[0]]) if l == "positive" else np.array([[0],[1]])
+                l = np.array([[1],[0]]) if l.strip() == "positive" else np.array([[0],[1]])
                 d = ",".join(line[:-1])
                 d = self.preprocess(d)
 
                 if i < train_cutoff:
-                    self.data.append(d)
-                    self.labels.append(l)
+                    self.training_data.append(d)
+                    self.training_labels.append(l)
                 else:
-                    self.test.append(d)
+                    self.test_data.append(d)
                     self.test_labels.append(l)
             print(f"\rProcessed {d_size} / {d_size} entries.", flush=True)
 
@@ -50,7 +50,8 @@ class IMDBDataset():
         t = word_tokenize(t)
         t = [w for w in t if w.isalpha()]
         t = [w.lower() for w in t if w.lower() not in self.stopwords]
-        t = " ".join(t)
+        t = "".join(t)
+        t = t[:100]
 
         self.vocab = self.vocab.union(set(t))
 
@@ -60,8 +61,8 @@ class IMDBDataset():
         return t
 
     def pad_data(self):
-        for i, d in enumerate(self.data):
-            self.data[i] = d + "=" * (self.seq_len - len(d))
+        for i, d in enumerate(self.training_data):
+            self.training_data[i] = d + "=" * (self.seq_len - len(d))
 
-        for i, d in enumerate(self.test):
-            self.test[i] = d + "=" * (self.seq_len - len(d))
+        for i, d in enumerate(self.test_data):
+            self.test_data[i] = d + "=" * (self.seq_len - len(d))
