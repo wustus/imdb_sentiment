@@ -5,9 +5,12 @@ import numpy as np
 import nltk
 import re
 
-class IMDBDataset():
+class DatasetLoader():
 
-    def __init__(self, path):
+    def __init__(self, path, data_cutoff=None, sample_cutoff=None):
+
+        self.data_cutoff = data_cutoff
+        self.sample_cutoff = sample_cutoff
 
         self.training_data = []
         self.training_labels = []
@@ -21,7 +24,11 @@ class IMDBDataset():
         self.stopwords = nltk.corpus.stopwords.words("english")
 
         with open(path, encoding="utf-8") as f:
-            lines = f.readlines()[1:][:20000]
+            lines = f.readlines()[1:]
+
+            if self.data_cutoff:
+                lines = lines[:self.data_cutoff]
+
             train_cutoff = len(lines) / 2
             d_size = len(lines)
             for i, line in enumerate(lines):
@@ -51,7 +58,8 @@ class IMDBDataset():
         t = [w for w in t if w.isalpha()]
         t = [w.lower() for w in t if w.lower() not in self.stopwords]
         t = "".join(t)
-        t = t[:100]
+        if self.sample_cutoff:
+            t = t[:self.sample_cutoff]
 
         self.vocab = self.vocab.union(set(t))
 
