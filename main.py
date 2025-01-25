@@ -84,6 +84,8 @@ def train_lstm(data_cutoff=None, sample_cutoff=None):
         indices = [i for i in range(len(ds.training_data))]
         np.random.shuffle(indices)
 
+        c = 0
+
         for i in indices:
             d, l = ds.training_data[i], ds.training_labels[i]
             h_prev = np.zeros((net.hidden_size, 1,))
@@ -91,12 +93,11 @@ def train_lstm(data_cutoff=None, sample_cutoff=None):
 
             d_enc = [net.char_to_ix[c] for c in d]
             loss = net.train(d_enc, l, h_prev, c_prev, eta=2e-3)
+            c += 1
 
-            if e % 10 == 0:
-                print(f"\r\tSeen {i} samples.", end="", flush=True)
+            print(f"\r\tSeen {c} samples.", end="", flush=True)
 
-        if e % 10 == 0:
-            print(f"\r\tSeen {len(ds.training_data)} samples.", flush=True)
+        print(f"\r\tSeen {len(ds.training_data)} samples.", flush=True)
         correct = 0
         seen = 0
 
@@ -110,12 +111,10 @@ def train_lstm(data_cutoff=None, sample_cutoff=None):
             t_loss += loss
             correct += 1 if p.argmax() == l.argmax() else 0
             seen += 1
-            if e % 10 == 0:
-                print(f"\rEpoch {e}: {correct} / {seen}.", end="", flush=True)
+            print(f"\rEpoch {e}: {correct} / {seen} ({(correct / seen) * 100: .2f}%).", end="", flush=True)
 
-        if e % 10 == 0:
-            print(f"\rEpoch {e}: {correct} / {len(ds.test_data)} - Loss: {t_loss: .4f}.", flush=True)
+        print(f"\rEpoch {e}: {correct} / {len(ds.test_data)} ({(correct / seen) * 100: .2f}%) - Loss: {t_loss / len(ds.test_data): .4f}.", flush=True)
 
 
 if __name__ == "__main__":
-    train_lstm(40, 100)
+    train_lstm(None, 100)
