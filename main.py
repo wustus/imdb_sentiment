@@ -73,40 +73,49 @@ def train_lstm(data_cutoff=None, sample_cutoff=None):
     print(f"Sample Cutoff: {sample_cutoff}")
 
     ds = DatasetLoader("data/dataset.csv", data_cutoff, sample_cutoff)
-    net = Network(ds.vocab, 100, 2)
+    net = Network(ds.vocab, 200, 2)
 
     print(f"Vocabulary size: {len(ds.vocab)}")
 
-    epochs = 200
+    epochs = 10_000
 
     for e in range(1, epochs+1):
 
-        print(f"\rTraining Epoch {e}.")
+        indices = [i for i in range(len(ds.training_data))]
+        np.random.shuffle(indices)
 
-        for i, (d, l) in enumerate(zip(ds.training_data, ds.training_labels)):
+        for i in indices:
+            d, l = ds.training_data[i], ds.training_labels[i]
             h_prev = np.zeros((net.hidden_size, 1,))
             c_prev = np.zeros((net.hidden_size, 1,))
 
             d_enc = [net.char_to_ix[c] for c in d]
-            net.train(d_enc, l, h_prev, c_prev, eta=0.5)
+            loss = net.train(d_enc, l, h_prev, c_prev, eta=2e-3)
 
-            print(f"\r\tSeen {i} samples.", end="", flush=True)
+            if e % 10 == 0:
+                print(f"\r\tSeen {i} samples.", end="", flush=True)
 
-        print(f"\r\tSeen {len(ds.training_data)} samples.", flush=True)
+        if e % 10 == 0:
+            print(f"\r\tSeen {len(ds.training_data)} samples.", flush=True)
         correct = 0
         seen = 0
 
+        t_loss = 0
         for d, l in zip(ds.test_data, ds.test_labels):
             h_prev = np.zeros((net.hidden_size, 1,))
             c_prev = np.zeros((net.hidden_size, 1,))
             d_enc = [net.char_to_ix[c] for c in d]
             p = net(d_enc, h_prev, c_prev)
+            loss = -np.sum(l * np.log(p))
+            t_loss += loss
             correct += 1 if p.argmax() == l.argmax() else 0
             seen += 1
-            print(f"\rEpoch {e}: {correct} / {seen}.", end="", flush=True)
+            if e % 10 == 0:
+                print(f"\rEpoch {e}: {correct} / {seen}.", end="", flush=True)
 
-        print(f"\rEpoch {e}: {correct} / {len(ds.test_data)}.", flush=True)
+        if e % 10 == 0:
+            print(f"\rEpoch {e}: {correct} / {len(ds.test_data)} - Loss: {t_loss: .4f}.", flush=True)
 
 
 if __name__ == "__main__":
-    train_lstm(20000, 500)
+    train_lstm(40, 100)

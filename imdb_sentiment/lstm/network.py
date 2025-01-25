@@ -23,28 +23,30 @@ class Network:
         self.char_to_ix = { c: i for i, c in enumerate(vocab) }
 
         # forget gate
-        self.Wfx = np.random.randn(hidden_size, self.vocab_size) * 0.01
-        self.Whf = np.random.randn(hidden_size, hidden_size) * 0.01
-        self.bf = np.random.randn(hidden_size, 1) * 0.01
+        self.Wfx = np.random.randn(hidden_size, self.vocab_size) * np.sqrt(1 / self.vocab_size)
+        self.Whf = np.random.randn(hidden_size, hidden_size) * np.sqrt(1 / self.hidden_size)
+        self.bf = np.full((hidden_size, 1), 2, dtype=float)
 
         # input gate
-        self.Wix = np.random.randn(hidden_size, self.vocab_size) * 0.01
-        self.Whi = np.random.randn(hidden_size, hidden_size) * 0.01
-        self.bi = np.random.randn(hidden_size, 1) * 0.01
+        self.Wix = np.random.randn(hidden_size, self.vocab_size) * np.sqrt(1 / self.vocab_size)
+        self.Whi = np.random.randn(hidden_size, hidden_size) * np.sqrt(1 / self.hidden_size)
+        self.bi = np.zeros((hidden_size, 1))
 
         # cell gate
-        self.Wcx = np.random.randn(hidden_size, self.vocab_size) * 0.01
-        self.Whc = np.random.randn(hidden_size, hidden_size) * 0.01
-        self.bc = np.random.randn(hidden_size, 1) * 0.01
+        self.Wcx = np.random.randn(hidden_size, self.vocab_size) * np.sqrt(1 / self.vocab_size)
+        self.Whc = np.random.randn(hidden_size, hidden_size) * np.sqrt(1 / self.hidden_size)
+        self.bc = np.zeros((hidden_size, 1))
 
         # output gate
-        self.Wox = np.random.randn(hidden_size, self.vocab_size) * 0.01
-        self.Who = np.random.randn(hidden_size, hidden_size) * 0.01
-        self.bo = np.random.randn(hidden_size, 1) * 0.01
+        self.Wox = np.random.randn(hidden_size, self.vocab_size) * np.sqrt(1 / self.vocab_size)
+        self.Who = np.random.randn(hidden_size, hidden_size) * np.sqrt(1 / self.hidden_size)
+        self.bo = np.zeros((hidden_size, 1))
 
         # output
-        self.Why = np.random.randn(out_size, hidden_size) * 0.01
-        self.by = np.random.randn(out_size, 1) * 0.01
+        self.Why = np.random.randn(out_size, hidden_size)
+        self.by = np.random.randn(out_size, 1)
+
+        self.mem = {}
 
 
     def __call__(self, ins, h_prev, c_prev):
@@ -82,8 +84,10 @@ class Network:
 
         # y = V@ht + bp
         y = self.Why@ht + self.by
+        y = y - np.max(y)
+        p = np.exp(y) / np.sum(np.exp(y), axis=0, keepdims=True)
 
-        return y
+        return p
 
 
     def train(self, ins, target, h_prev, c_prev, eta=1e-2):
@@ -145,10 +149,10 @@ class Network:
 
         # y = V@ht + bp
         y = self.Why@ht + self.by
+        y = y - np.max(y)
+        p = np.exp(y) / np.sum(np.exp(y), axis=0, keepdims=True)
 
-        # L = 1/2 (y - target)^2
-        # dL/dy = y - target
-        dy = y - target
+        dy = p - target
 
         # dL/dV = dL/dy * dy/dV = (y-target) * ht.T
         dWhy = dy@ht.T
@@ -178,6 +182,7 @@ class Network:
         for t in reversed(range(0, len(ins))):
 
             dht = dhn
+            ct = cs[t]
 
             # dL/dct = dL/dht * dht/dct
             t_ct = np.tanh(ct)
@@ -218,25 +223,78 @@ class Network:
             dhn = dh_prev
             dcn = dc_prev
 
-
         for grad in [dhn, dcn, dWfx, dWhf, dbf, dWix, dWhi, dbi, dWcx, dWhc, dbc, dWox, dWho, dbo, dWhy, dby]:
             np.clip(grad, -5, 5, out=grad)
 
-        self.Wfx -= eta * dWfx
-        self.Whf -= eta * dWhf
-        self.bf -= eta * dbf
-         
-        self.Wix -= eta * dWix
-        self.Whi -= eta * dWhi
-        self.bi -= eta * dbi
-         
-        self.Wcx -= eta * dWcx
-        self.Whc -= eta * dWhc
-        self.bc -= eta * dbc
-         
-        self.Wox -= eta * dWox
-        self.Who -= eta * dWho
-        self.bo -= eta * dbo
+        # forget gate
+        if "Wfx" not in self.mem:
+            self.mem["Wfx"] = np.zeros_like(self.Wfx)
 
-        self.Why -= eta * dWhy
-        self.by -= eta * dby
+        if "Whf" not in self.mem:
+            self.mem["Whf"] = np.zeros_like(self.Whf)
+
+        if "bf" not in self.mem:
+            self.mem["bf"] = np.zeros_like(self.bf)
+
+        self.mem["Wfx"] += dWfx**2
+        self.Wfx -= eta * dWfx / (np.sqrt(self.mem["Wfx"]) + 1e-8)
+        self.mem["Whf"] += dWhf**2
+        self.Whf -= eta * dWhf / (np.sqrt(self.mem["Whf"]) + 1e-8)
+        self.mem["bf"] += dbf**2
+        self.bf -= eta * dbf / (np.sqrt(self.mem["bf"]) + 1e-8)
+         
+        # input gate
+        if "Wix" not in self.mem:
+            self.mem["Wix"] = np.zeros_like(self.Wix)
+        if "Whi" not in self.mem:
+            self.mem["Whi"] = np.zeros_like(self.Whi)
+        if "bi" not in self.mem:
+            self.mem["bi"] = np.zeros_like(self.bi)
+
+        self.mem["Wix"] += dWix**2
+        self.Wix -= eta * dWix / (np.sqrt(self.mem["Wix"]) + 1e-8)
+        self.mem["Whi"] += dWhi**2
+        self.Whi -= eta * dWhi / (np.sqrt(self.mem["Whi"]) + 1e-8)
+        self.mem["bi"] += dbi**2
+        self.bi -= eta * dbi / (np.sqrt(self.mem["bi"]) + 1e-8)
+
+        # cell gate
+        if "Wcx" not in self.mem:
+            self.mem["Wcx"] = np.zeros_like(self.Wcx)
+        if "Whc" not in self.mem:
+            self.mem["Whc"] = np.zeros_like(self.Whc)
+        if "bc" not in self.mem:
+            self.mem["bc"] = np.zeros_like(self.bc)
+
+        self.mem["Wcx"] += dWcx**2
+        self.Wcx -= eta * dWcx / (np.sqrt(self.mem["Wcx"]) + 1e-8)
+        self.mem["Whc"] += dWhc**2
+        self.Whc -= eta * dWhc / (np.sqrt(self.mem["Whc"]) + 1e-8)
+        self.mem["bc"] += dbc**2
+        self.bc -= eta * dbc / (np.sqrt(self.mem["bc"]) + 1e-8)
+
+        # output gate
+        if "Wox" not in self.mem:
+            self.mem["Wox"] = np.zeros_like(self.Wox)
+        if "Who" not in self.mem:
+            self.mem["Who"] = np.zeros_like(self.Who)
+        if "bo" not in self.mem:
+            self.mem["bo"] = np.zeros_like(self.bo)
+
+        self.mem["Wox"] += dWox**2
+        self.Wox -= eta * dWox / (np.sqrt(self.mem["Wox"]) + 1e-8)
+        self.mem["Who"] += dWho**2
+        self.Who -= eta * dWho / (np.sqrt(self.mem["Who"]) + 1e-8)
+        self.mem["bo"] += dbo**2
+        self.bo -= eta * dbo / (np.sqrt(self.mem["bo"]) + 1e-8)
+
+        # output layer
+        if "Why" not in self.mem:
+            self.mem["Why"] = np.zeros_like(self.Why)
+        if "by" not in self.mem:
+            self.mem["by"] = np.zeros_like(self.by)
+
+        self.mem["Why"] += dWhy**2
+        self.Why -= eta * dWhy / (np.sqrt(self.mem["Why"]) + 1e-8)
+        self.mem["by"] += dby**2
+        self.by -= eta * dby / (np.sqrt(self.mem["by"]) + 1e-8)
