@@ -1,18 +1,18 @@
 
 import numpy as np
 
+
 class Network:
 
-    def __init__(self, in_size, hidden_size, out_size, vocab):
+    def __init__(self, vocab, hidden_size, out_size):
 
-        self.in_size = in_size
         self.hidden_size = hidden_size
         self.out_size = out_size
 
         self.vocab = vocab
 
         self.vocab_size = len(vocab)
-        self.char_to_ix = { c: i for i,c in enumerate(vocab) }
+        self.char_to_ix = { c: i for i, c in enumerate(vocab) }
 
         self.Wxh = np.random.randn(hidden_size, self.vocab_size) * 0.01
         self.Whh = np.random.randn(hidden_size, hidden_size) * 0.01

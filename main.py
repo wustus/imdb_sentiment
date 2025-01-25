@@ -12,7 +12,7 @@ def train_rnn(data_cutoff=None, sample_cutoff=None):
     print(f"Sample Cutoff: {sample_cutoff}")
 
     ds = DatasetLoader("data/dataset.csv", data_cutoff, sample_cutoff)
-    net = Network(ds.seq_len, 100, 2, ds.vocab)
+    net = Network(ds.vocab, 100, 2)
 
     print(f"Vocabulary size: {len(ds.vocab)}")
 
@@ -38,10 +38,12 @@ def train_rnn(data_cutoff=None, sample_cutoff=None):
             loss, h_prev, dWxh, dWhh, dWhy, dbh, dby = net.train(d_enc, l, hprev)
             t_loss += loss
 
-            for param, dparam, mem in zip([net.Wxh, net.Whh, net.Why, net.bh, net.by], 
-                                    [dWxh, dWhh, dWhy, dbh, dby], 
-                                    [mWxh, mWhh, mWhy, mbh, mby]):
-                mem +=  dparam**2
+            for param, dparam, mem in zip(
+                                        [net.Wxh, net.Whh, net.Why, net.bh, net.by],
+                                        [dWxh, dWhh, dWhy, dbh, dby],
+                                        [mWxh, mWhh, mWhy, mbh, mby]):
+
+                mem += dparam**2
                 param += -net.eta * dparam / np.sqrt(mem + 1e-8)
 
             if i > 0 and i % 1000 == 0:
@@ -59,5 +61,52 @@ def train_rnn(data_cutoff=None, sample_cutoff=None):
         print(f"Epoch {e}: {correct} / {len(ds.test_data)}.")
 
 
+def train_lstm(data_cutoff=None, sample_cutoff=None):
+
+    from imdb_sentiment.utils.dataset_loader import DatasetLoader
+    from imdb_sentiment.lstm.network import Network
+
+    import numpy as np
+
+    print("Training Recurrent Neural Network.")
+    print(f"Data Cutoff: {data_cutoff}")
+    print(f"Sample Cutoff: {sample_cutoff}")
+
+    ds = DatasetLoader("data/dataset.csv", data_cutoff, sample_cutoff)
+    net = Network(ds.vocab, 100, 2)
+
+    print(f"Vocabulary size: {len(ds.vocab)}")
+
+    epochs = 200
+
+    for e in range(1, epochs+1):
+
+        print(f"\rTraining Epoch {e}.")
+
+        for i, (d, l) in enumerate(zip(ds.training_data, ds.training_labels)):
+            h_prev = np.zeros((net.hidden_size, 1,))
+            c_prev = np.zeros((net.hidden_size, 1,))
+
+            d_enc = [net.char_to_ix[c] for c in d]
+            net.train(d_enc, l, h_prev, c_prev, eta=0.5)
+
+            print(f"\r\tSeen {i} samples.", end="", flush=True)
+
+        print(f"\r\tSeen {len(ds.training_data)} samples.", flush=True)
+        correct = 0
+        seen = 0
+
+        for d, l in zip(ds.test_data, ds.test_labels):
+            h_prev = np.zeros((net.hidden_size, 1,))
+            c_prev = np.zeros((net.hidden_size, 1,))
+            d_enc = [net.char_to_ix[c] for c in d]
+            p = net(d_enc, h_prev, c_prev)
+            correct += 1 if p.argmax() == l.argmax() else 0
+            seen += 1
+            print(f"\rEpoch {e}: {correct} / {seen}.", end="", flush=True)
+
+        print(f"\rEpoch {e}: {correct} / {len(ds.test_data)}.", flush=True)
+
+
 if __name__ == "__main__":
-    train_rnn(5000, 100)
+    train_lstm(20000, 500)
