@@ -92,7 +92,7 @@ def train_lstm(data_cutoff=None, sample_cutoff=None):
             c_prev = np.zeros((net.hidden_size, 1,))
 
             d_enc = [net.char_to_ix[c] for c in d]
-            loss = net.train(d_enc, l, h_prev, c_prev, eta=2e-3)
+            loss = net.train(d_enc, l, h_prev, c_prev, eta=1e-2)
             c += 1
 
             print(f"\r\tSeen {c} samples.", end="", flush=True)
@@ -116,5 +116,57 @@ def train_lstm(data_cutoff=None, sample_cutoff=None):
         print(f"\rEpoch {e}: {correct} / {len(ds.test_data)} ({(correct / seen) * 100: .2f}%) - Loss: {t_loss / len(ds.test_data): .4f}.", flush=True)
 
 
+# article: https://hassaanbinaslam.github.io/myblog/posts/2022-11-09-pytorch-lstm-imdb-sentiment-prediction.html
+def train_pytorch_lstm():
+
+    from imdb_sentiment.pytorch.imdb_dataset import IMDBDataset
+    from imdb_sentiment.pytorch.network import LSTMNetwork
+
+    import torch
+    from torch import optim
+    from torch.utils.data import DataLoader
+
+    ds = IMDBDataset("data/dataset.csv")
+    dl = DataLoader(ds, batch_size=32, shuffle=True)
+
+    vocab_size = ds.vocab_size
+
+    device = torch.device("mps")
+
+    net = LSTMNetwork(vocab_size, 1000, 2).to(device)
+
+    opt = optim.Adagrad(net.parameters(), lr=0.005)
+
+    epochs = 200
+
+    for e in range(1, epochs+1):
+
+        net.train()
+
+        for xs, ys, _, _ in dl:
+            xs = xs.to(device)
+            ys = ys.to(device)
+            opt.zero_grad()
+            out = net(xs)
+            loss = torch.nn.functional.binary_cross_entropy_with_logits(out, ys)
+            loss.backward()
+            opt.step()
+
+        net.eval()
+
+        correct = 0
+
+        for _, _, xs, ys in dl:
+            xs = xs.to(device)
+            ys = ys.to(device)
+            out = net(xs)
+            pred = out.argmax(dim=1)
+            target = ys.argmax(dim=1)
+            correct += (pred == target).sum().item()
+
+        print(f"\rEpoch {e}: {correct} / {len(ds.training_data)} ({(correct / len(ds.training_data)) * 100: .2f}%).", flush=True)
+
+
 if __name__ == "__main__":
-    train_lstm(None, 100)
+    # train_lstm(None, 100)
+    train_pytorch_lstm()
