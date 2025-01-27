@@ -144,7 +144,7 @@ def train_pytorch_lstm():
         return data, labels, lenghts
 
     train_dl = DataLoader(train_ds, batch_size=batch_size, shuffle=True, collate_fn=collate)
-    test_dl = DataLoader(test_ds, batch_size=batch_size, shuffle=True, collate_fn=collate)
+    test_dl = DataLoader(test_ds, batch_size=batch_size, shuffle=False, collate_fn=collate)
 
     vocab_size = train_ds.vocab_size
 
@@ -152,7 +152,7 @@ def train_pytorch_lstm():
 
     net = LSTMNetwork(50, 1000, 1, vocab_size).to(device)
 
-    opt = optim.Adagrad(net.parameters(), lr=1e-3)
+    opt = optim.Adagrad(net.parameters(), lr=1e-2)
 
     epochs = 200
 
@@ -162,17 +162,19 @@ def train_pytorch_lstm():
 
         c = 0
 
+        t_loss = 0
         for xs, ys, l in train_dl:
             xs = xs.to(device)
             ys = ys.to(device)
             opt.zero_grad()
             out = net(xs, l)
             loss = torch.nn.functional.binary_cross_entropy_with_logits(out, ys)
+            t_loss += loss.item()
             loss.backward()
             opt.step()
             c = min(c + batch_size, len(train_ds.data))
             print(f"\rBatch {c}.", end="", flush=True)
-        print(f"\rBatch {len(train_ds.data)}.", flush=True)
+        print(f"\rBatch {len(train_ds.data)}, Loss: {t_loss / len(train_ds.data): .4f}.", flush=True)
 
         net.eval()
 

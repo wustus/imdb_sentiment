@@ -22,7 +22,6 @@ class IMDBDataset(Dataset):
         with open(path) as f:
 
             lines = f.readlines()[1:]
-            lines = lines[:1000]
             train_cutoff = int(len(lines) / 2)
             if test:
                 lines = lines[train_cutoff:]
@@ -38,12 +37,12 @@ class IMDBDataset(Dataset):
                 d = ",".join(line[:-1])
                 d = self.preprocess(d)
 
-                print(f"\rProcessed {i} / {d_size} entries.", end="", flush=True)
+                print(f"\rProcessed {i} / {d_size} {"test" if test else "training"} entries.", end="", flush=True)
 
                 self.data.append(d)
                 self.labels.append(l)
 
-            print(f"\rProcessed {d_size} / {d_size} entries.", flush=True)
+            print(f"\rProcessed {d_size} / {d_size} {"test" if test else "training"} entries.", flush=True)
              
         self.vocab = list(self.vocab)
         self.vocab += ["="]
