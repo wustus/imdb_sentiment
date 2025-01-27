@@ -125,15 +125,32 @@ def train_pytorch_lstm():
     import torch
     from torch import optim
     from torch.utils.data import DataLoader
+    from torch.nn.utils.rnn import pad_sequence
 
-    ds = IMDBDataset("data/dataset.csv")
-    dl = DataLoader(ds, batch_size=32, shuffle=True)
+    batch_size = 32
+    train_ds = IMDBDataset("data/dataset.csv")
+    test_ds = IMDBDataset("data/dataset.csv", test=True)
 
-    vocab_size = ds.vocab_size
+    def collate(batch):
+        data, labels, lengths = zip(*batch)
+        lengths = torch.Tensor(lengths)
+        data = pad_sequence(data, batch_first=True, padding_value=len(train_ds.vocab)-1)
+        labels = torch.stack(labels)
+        lenghts, sorted_idx = lengths.sort(descending=True)
+
+        data = data[sorted_idx]
+        labels = labels[sorted_idx]
+
+        return data, labels, lenghts
+
+    train_dl = DataLoader(train_ds, batch_size=batch_size, shuffle=True, collate_fn=collate)
+    test_dl = DataLoader(test_ds, batch_size=batch_size, shuffle=True, collate_fn=collate)
+
+    vocab_size = train_ds.vocab_size
 
     device = torch.device("mps")
 
-    net = LSTMNetwork(50, 1000, 2, vocab_size).to(device)
+    net = LSTMNetwork(50, 1000, 1, vocab_size).to(device)
 
     opt = optim.Adagrad(net.parameters(), lr=1e-3)
 
@@ -143,29 +160,31 @@ def train_pytorch_lstm():
 
         net.train()
 
-        for xs, ys, _, _ in dl:
+        c = 0
+
+        for xs, ys, l in train_dl:
             xs = xs.to(device)
             ys = ys.to(device)
             opt.zero_grad()
-            out = net(xs)
-            loss = torch.nn.functional.cross_entropy(out, ys.argmax(dim=1))
+            out = net(xs, l)
+            loss = torch.nn.functional.binary_cross_entropy_with_logits(out, ys)
             loss.backward()
             opt.step()
+            c = min(c + batch_size, len(train_ds.data))
+            print(f"\rBatch {c}.", end="", flush=True)
+        print(f"\rBatch {len(train_ds.data)}.", flush=True)
 
         net.eval()
 
         correct = 0
 
-        for _, _, xs, ys in dl:
+        for xs, ys, l in test_dl:
             xs = xs.to(device)
             ys = ys.to(device)
-            out = net(xs)
-            print(out, ys)
-            pred = out.argmax(dim=1)
-            target = ys.argmax(dim=1)
-            correct += (pred == target).sum().item()
+            out = net(xs, l)
+            correct += ((out >= 0.5).float() == ys).sum().item()
 
-        print(f"\rEpoch {e}: {correct} / {len(ds.training_data)} ({(correct / len(ds.training_data)) * 100: .2f}%).", flush=True)
+        print(f"\rEpoch {e}: {correct} / {len(test_ds.data)} ({(correct / len(test_ds.data)) * 100: .2f}%).", flush=True)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 
 from torch import nn
+from torch.nn.utils.rnn import pack_padded_sequence
 
 
 class LSTMNetwork(nn.Module):
@@ -15,12 +16,12 @@ class LSTMNetwork(nn.Module):
                 nn.Linear(hidden_size, out_size),
         )
 
-    def forward(self, xs):
+    def forward(self, xs, lengths):
 
         xs = self.embed(xs)
-
+        xs = pack_padded_sequence(xs, lengths.cpu(), batch_first=True)
         _, (hidden, _) = self.lstm(xs)
-        hT = hidden[-1]
+        hT = hidden[-1, :, :]
         out = self.out_layer(hT)
 
         return out
