@@ -25,6 +25,7 @@ class IMDBDataset(Dataset):
         with open(path) as f:
 
             lines = f.readlines()[1:]
+            lines = lines[:1000]
             train_cutoff = len(lines) / 2
 
             d_size = len(lines)
@@ -55,17 +56,16 @@ class IMDBDataset(Dataset):
         self.pad_data()
 
         for i in range(len(self.training_data)):
-            self.training_data[i] = torch.tensor([self.char_to_ix[c] for c in self.training_data[i]], dtype=torch.long)
+            self.training_data[i] = torch.tensor([self.char_to_ix[w] for w in self.training_data[i]], dtype=torch.long)
 
         for i in range(len(self.test_data)):
-            self.test_data[i] = torch.tensor([self.char_to_ix[c] for c in self.test_data[i]], dtype=torch.long)
+            self.test_data[i] = torch.tensor([self.char_to_ix[w] for w in self.test_data[i]], dtype=torch.long)
 
     def preprocess(self, t):
         t = re.sub(r"<.*?>", "", t)
         t = word_tokenize(t)
         t = [w for w in t if w.isalpha()]
         t = [w.lower() for w in t if w.lower() not in self.stopwords]
-        t = "".join(t)[:100]
 
         self.vocab = self.vocab.union(set(t))
 
@@ -76,10 +76,10 @@ class IMDBDataset(Dataset):
 
     def pad_data(self):
         for i, d in enumerate(self.training_data):
-            self.training_data[i] = d + "=" * (self.seq_len - len(d))
+            self.training_data[i] = d + ["="] * (self.seq_len - len(d))
 
         for i, d in enumerate(self.test_data):
-            self.test_data[i] = d + "=" * (self.seq_len - len(d))
+            self.test_data[i] = d + ["="] * (self.seq_len - len(d))
 
     def __len__(self):
         return len(self.training_data)

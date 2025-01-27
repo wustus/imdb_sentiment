@@ -133,9 +133,9 @@ def train_pytorch_lstm():
 
     device = torch.device("mps")
 
-    net = LSTMNetwork(vocab_size, 1000, 2).to(device)
+    net = LSTMNetwork(50, 1000, 2, vocab_size).to(device)
 
-    opt = optim.Adagrad(net.parameters(), lr=0.005)
+    opt = optim.Adagrad(net.parameters(), lr=1e-3)
 
     epochs = 200
 
@@ -148,7 +148,7 @@ def train_pytorch_lstm():
             ys = ys.to(device)
             opt.zero_grad()
             out = net(xs)
-            loss = torch.nn.functional.binary_cross_entropy_with_logits(out, ys)
+            loss = torch.nn.functional.cross_entropy(out, ys.argmax(dim=1))
             loss.backward()
             opt.step()
 
@@ -160,6 +160,7 @@ def train_pytorch_lstm():
             xs = xs.to(device)
             ys = ys.to(device)
             out = net(xs)
+            print(out, ys)
             pred = out.argmax(dim=1)
             target = ys.argmax(dim=1)
             correct += (pred == target).sum().item()
