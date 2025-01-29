@@ -117,7 +117,7 @@ def train_lstm(data_cutoff=None, sample_cutoff=None):
 
 
 # article: https://hassaanbinaslam.github.io/myblog/posts/2022-11-09-pytorch-lstm-imdb-sentiment-prediction.html
-def train_pytorch_lstm():
+def train_pytorch_lstm(cutoff=None):
 
     from imdb_sentiment.pytorch.imdb_dataset import IMDBDataset
     from imdb_sentiment.pytorch.network import LSTMNetwork
@@ -127,9 +127,9 @@ def train_pytorch_lstm():
     from torch.utils.data import DataLoader
     from torch.nn.utils.rnn import pad_sequence
 
-    batch_size = 32
-    train_ds = IMDBDataset("data/dataset.csv")
-    test_ds = IMDBDataset("data/dataset.csv", test=True)
+    batch_size = 512
+    train_ds = IMDBDataset("data/dataset.csv", cutoff=cutoff)
+    test_ds = IMDBDataset("data/dataset.csv", cutoff=cutoff, test=True)
 
     def collate(batch):
         data, labels, lengths = zip(*batch)
@@ -150,9 +150,9 @@ def train_pytorch_lstm():
 
     device = torch.device("mps")
 
-    net = LSTMNetwork(50, 1000, 1, vocab_size).to(device)
+    net = LSTMNetwork(200, 400, 1, vocab_size).to(device)
 
-    opt = optim.Adagrad(net.parameters(), lr=1e-2)
+    opt = optim.Adagrad(net.parameters(), lr=5e-3)
 
     epochs = 200
 

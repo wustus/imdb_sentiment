@@ -1,6 +1,7 @@
 
 from torch.utils.data import Dataset
 from nltk.tokenize import word_tokenize
+from torchtext.vocab import GloVe
 
 import torch
 import nltk
@@ -9,7 +10,7 @@ import re
 
 class IMDBDataset(Dataset):
 
-    def __init__(self, path, test=False):
+    def __init__(self, path, dim=200, cutoff=None, test=False):
         self.data = []
         self.labels = []
 
@@ -22,6 +23,10 @@ class IMDBDataset(Dataset):
         with open(path) as f:
 
             lines = f.readlines()[1:]
+
+            if cutoff:
+                lines = lines[:cutoff]
+
             train_cutoff = int(len(lines) / 2)
             if test:
                 lines = lines[train_cutoff:]
@@ -47,17 +52,22 @@ class IMDBDataset(Dataset):
         self.vocab = list(self.vocab)
         self.vocab += ["="]
         self.vocab_size = len(self.vocab)
-
-        self.char_to_ix = { c: i for i, c in enumerate(self.vocab) }
+        self.glove = GloVe(name="6B", dim=200)
 
         for i in range(len(self.data)):
-            self.data[i] = torch.tensor([self.char_to_ix[w] for w in self.data[i]], dtype=torch.long)
+            self.data[i] = torch.stack([
+                self.glove.get_vecs_by_tokens(token, lower_case_backup=True)
+                if token in self.glove.stoi else torch.zeros(200)
+                for token in self.data[i]
+            ])
 
     def preprocess(self, t):
         t = re.sub(r"<.*?>", "", t)
         t = word_tokenize(t)
-        t = [w for w in t if w.isalpha()]
-        t = [w.lower() for w in t if w.lower() not in self.stopwords]
+        # remove non-alphabetic characters
+        # test with other characters
+        #   t = [w for w in t if w.isalpha()]
+        #   t = [w.lower() for w in t if w.lower() not in self.stopwords]
 
         self.vocab = self.vocab.union(set(t))
 
