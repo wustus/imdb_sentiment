@@ -127,6 +127,8 @@ def train_pytorch_lstm(cutoff=None):
     from torch.utils.data import DataLoader
     from torch.nn.utils.rnn import pad_sequence
 
+    import os
+
     batch_size = 512
     train_ds = IMDBDataset("data/dataset.csv", cutoff=cutoff)
     test_ds = IMDBDataset("data/dataset.csv", cutoff=cutoff, test=True)
@@ -150,13 +152,21 @@ def train_pytorch_lstm(cutoff=None):
 
     device = torch.device("mps")
 
-    net = LSTMNetwork(200, 400, 1, vocab_size).to(device)
+    net = LSTMNetwork(200, 256, 1, vocab_size, dropout=0.2).to(device)
 
-    opt = optim.Adagrad(net.parameters(), lr=5e-3)
+    if os.path.exists("data/pytorch_lstm_model.pth"):
+        choice = input("Model found. Load it? (Y/n): ").strip()
+        if choice.lower() == "y" or choice == "":
+            state_dict = torch.load("data/pytorch_lstm_model.pth", weights_only=True)
+            net.load_state_dict(state_dict)
+            print("Using saved model.")
 
-    epochs = 200
+    opt = optim.Adagrad(net.parameters(), lr=1e-4)
 
-    for e in range(1, epochs+1):
+    epochs = 10
+    e = 1
+
+    while e <= epochs:
 
         net.train()
 
@@ -187,6 +197,18 @@ def train_pytorch_lstm(cutoff=None):
             correct += ((out >= 0.5).float() == ys).sum().item()
 
         print(f"\rEpoch {e}: {correct} / {len(test_ds.data)} ({(correct / len(test_ds.data)) * 100: .2f}%).", flush=True)
+
+        if e % 10 == 0:
+            choice = input("Continue? (y/N): ")
+            if choice.lower() == "y":
+                epochs += 10
+
+        e += 1
+
+    choice = input("Save Model? (Y/n): ").strip()
+    if choice.lower() == "y" or choice == "":
+        torch.save(net.state_dict(), "data/pytorch_lstm_model.pth")
+        print("Model saved.")
 
 
 if __name__ == "__main__":

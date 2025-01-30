@@ -1,5 +1,7 @@
 # PyTorch GloVe Cache
 .vector_cache/
+# PyTorch Models
+data/*.pth
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
